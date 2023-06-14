@@ -11,11 +11,13 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
-import os
+import os, sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+# print('BASE_DIR:',BASE_DIR)
 
+sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -26,12 +28,17 @@ SECRET_KEY = 'django-insecure-n5&o%cmq#d=bmu-@&6h^prv7n9tm4%l6l&tq3rmn6&-zww2jtg
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['www.meiduo.site', '127.0.0.1']
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    # 我的应用
+    'apps.users',
+    # CORS
+    'corsheaders',
+    # 默认应用
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -40,11 +47,13 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 ]
 
+
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -187,4 +196,17 @@ LOGGING = {
         },
     }
 }
+################# 替换系统USER ##################
+# 通过提供一个值给AUTH_USER_MODEL设置，指向自定义的模型，Django允许你覆盖默认的User模型：
+# 这个点式路径包含Django应用的名称（必须位于你的INSTALLED_APPS中），和要用作User模型的Django模型的名称。
+AUTH_USER_MODEL = 'users.User'
+
+############### CORS ###############
+CORS_ORIGIN_WHITELIST = (
+    'http://127.0.0.1:8080',
+    'http://localhost:8080',
+    'http://www.meiduo.site:8080',
+    'http://www.meiduo.site:8000'
+)
+CORS_ALLOW_CREDENTIALS = True  # 允许携带cookie
 
