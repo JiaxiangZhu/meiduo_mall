@@ -2,7 +2,9 @@ import json
 import re
 
 from MySQLdb import DatabaseError
+from django.contrib.auth import logout
 from django.shortcuts import render
+from django_redis import get_redis_connection
 
 # Create your views here.
 """
@@ -86,6 +88,7 @@ class RegisterView(View):
         password = body_dict.get('password')
         password2 = body_dict.get('password2')
         mobile = body_dict.get('mobile')
+        sms_code = body_dict.get('sms_code')
         allow = body_dict.get('allow')
         # 3. 验证数据
         #     3.1 用户名、密码、确认密码、手机号，是否同意协议 都要有
@@ -99,12 +102,19 @@ class RegisterView(View):
         #     3.4 确认密码和密码一致
         #     3.5 手机号满足规则，手机号也不能重复
         #     3.6 需要同意协议
+        #   短信验证码测试
+        redis_conn = get_redis_connection('code')
+        sms_data = redis_conn.get(f'{mobile}')
+        if not sms_data:
+            return JsonResponse({'code': 400, 'errmsg': '短信验证码失效'})
+        if sms_code != sms_data.decode():
+            return JsonResponse({'code': 400, 'errmsg': '短信验证码错误'})
+
         # 4. 数据入库
         # user = User(username=username, password=password, mobile=mobile)
         # user.save()
         # User.objects.create(username=username, password=password, mobile=mobile)
         # 以上两种方式都可以数据入库，但是存在一个问题，密码没有加密
-
         # 密码加密
         try:
             user = User.objects.create_user(username=username, password=password, mobile=mobile)
@@ -129,3 +139,70 @@ class RegisterView(View):
     在客户端存储信息使用Cookie
     在服务器端存储信息使用Session
 """
+
+# 用户登录
+class LoginView(View):
+
+    def post(self, request):
+        # 1. 接受请求
+        body_bytes = request.body
+        body_str = body_bytes.decode()
+        body_dict = json.loads(body_str)
+        # 2. 获取参数
+        username = body_dict.get('username')
+        password = body_dict.get('password')
+        remembered = body_dict.get('remembered')
+
+        if not all([username, password, remembered]):
+            return JsonResponse({'code': 400, 'errmsg': '未填写账号密码'})
+
+        # 需要确定是根据手机号查询还是根据用户名查询
+        if re.match('1[3-9]\d{9}', username):
+            User.USERNAME_FIELD = 'mobile'
+        else:
+            User.USERNAME_FIELD = 'username'
+
+        # 3. 验证用户名和密码是否正确
+        # 我们可以通过模型根据用户名来查询
+        # User.object.get(username=username)
+
+        # 方式2
+        from django.contrib.auth import authenticate
+        # authenticate 传递用户名和密码
+        # 如果用户名和密码正确，则返回User信息
+        # 如果用户名和密码不正确，则返回None
+        user = authenticate(username=username, password=password)
+
+        if user is None:
+            return JsonResponse({'code': 400, 'errmsg': '账号或密码错误'})
+
+        # 4. session
+        from django.contrib.auth import login
+        login(request, user)
+
+        # 5. 判断是否记住登录
+        if not remembered:
+            request.session.set_expiry(0)
+        else:
+            request.session.set_expiry(None)
+
+        response = JsonResponse({'code': 0, 'errmsg': 'ok'})
+        response.set_cookie('username', user.username, max_age=3600*24*15)
+        return response
+
+class LogoutView(View):
+
+    def delete(self, request):
+        # 清理session
+        logout(request)
+        # 退出登录，重定向到首页
+        response = JsonResponse({'code': 0, 'errmsg': 'ok'})
+        # 退出登录时，清除cookie中的username
+        response.delete_cookie('username')
+
+        return response
+from utils.views import LoginRequiredJSONMixin
+class CenterView(LoginRequiredJSONMixin, View):
+
+    def get(self, request):
+        return JsonResponse({'code': 0, 'errmsg': 'ok'})
