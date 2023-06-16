@@ -36,6 +36,7 @@ ALLOWED_HOSTS = ['www.meiduo.site', '127.0.0.1']
 INSTALLED_APPS = [
     # 我的应用
     'apps.users',
+    'apps.verifications',
     # CORS
     'corsheaders',
     # 默认应用
@@ -143,6 +144,7 @@ CACHES = {
         "LOCATION": "redis://127.0.0.1:6379/0",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            'PASSWORD': '123456',
         }
     },
     "session": { # session
@@ -150,6 +152,15 @@ CACHES = {
         "LOCATION": "redis://127.0.0.1:6379/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            'PASSWORD': '123456',
+        }
+    },
+    "code": { # 验证码
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/2",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            'PASSWORD': '123456',
         }
     },
 }
