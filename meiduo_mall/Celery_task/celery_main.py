@@ -6,7 +6,7 @@
 
 from celery import Celery
 
-#为使用celery使用django配置文件进行设置
+# 为使用celery使用django配置文件进行设置
 import os
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'meiduo_mall.settings')
 
@@ -15,7 +15,7 @@ celery_app = Celery('celery_tasks')
 # 加载celery配置
 celery_app.config_from_object('Celery_task.config')
 # 自动注册celery任务
-celery_app.autodiscover_tasks(['Celery_task.sms'])
+celery_app.autodiscover_tasks(['Celery_task.email', 'Celery_task.sms'])
 
 # 启动
-# celery -A celery_tasks.main worker -l info -P eventlet
+# celery -A Celery_task.celery_main worker -l INFO -P eventlet

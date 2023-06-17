@@ -34,7 +34,10 @@ from django_redis import get_redis_connection
 from django.views import View
 from apps.users.models import User
 from django.http import JsonResponse
-
+# 1. 导入
+import logging
+# 2. 创建日志器
+logger = logging.getLogger('django')
 
 class UsernameCountView(View):
 
@@ -205,4 +208,68 @@ from utils.views import LoginRequiredJSONMixin
 class CenterView(LoginRequiredJSONMixin, View):
 
     def get(self, request):
-        return JsonResponse({'code': 0, 'errmsg': 'ok'})
+        # request.user 就是已经登录的用户信息
+        # request.user 是来源于中间件 AuthenticationMiddleware
+        # 系统会进行判断，如果我们确实是登录用户，则可以获取到登录用户对应的模型实例数据
+        # 如果我们确实不是登录用户，则request.user = AnonymousUser() 匿名用户
+        info_data = {
+            'username': request.user.username,
+            'mobile': request.user.mobile,
+            'email': request.user.email,
+            'email_active': request.user.email_active,
+        }
+
+        return JsonResponse({'code': 0, 'errmsg': 'ok', 'info_data': info_data})
+
+"""邮箱保存
+需求：1.保存邮箱地址，2.发送激活邮件，3.用户激活邮件
+前端：
+    当用户输入邮箱之后，点击保存，这个时候会发送axios请求。
+后端：
+    请求 ：        接受请求，获取数据
+    业务逻辑：   保存邮箱地址，发送激活邮件
+    响应：         JSON
+    路由：     PUT
+
+步骤：
+    1.接受请求
+    2.获取数据
+    3.保存邮箱地址
+    4.发送一封激活邮件
+    5.返回响应
+
+"""
+class EmailView(LoginRequiredJSONMixin, View):
+
+    def put(self, request):
+        # 接受请求，获取数据
+        body_dict = json.loads(request.body.decode())
+        email = body_dict.get('email')
+        # 检验数据
+        if not email:
+            return JsonResponse({'code': 400, 'errmsg': '缺少邮箱信息'})
+        if not re.match(r'^[a-z0-9][\w\.\-]*@[a-z0-9\-]+(\.[a-z]{2,5}){1,2}$', email):
+            return JsonResponse({'code': 400, 'errmsg': '邮箱错误'})
+        # 更新数据
+        try:
+            request.user.email = email
+            request.user.save()
+        except Exception as e:
+            logger.error(e)
+            return JsonResponse({'code': 400, 'errmsg': '添加邮箱失败'})
+        # 发送邮件
+        from Celery_task.email.tasks import send_verify_email
+        user_id = request.user.id
+        verify_url = f'http://www.meiduo.site:8080/index.html?token={user_id}'
+        send_verify_email.delay(to_email=email, verify_url=verify_url)
+        # from django.core.mail import send_mail
+        # subject = '美多商城激活邮件'
+        # message = ''
+        # from_email = '美多商城<zsjsxg@163.com>'
+        # recipient_list = ['zsjsxg@163.com', '736019854@qq.com']
+        # user_id = request.user.id
+        # html_message = f"点击按钮进行激活 <a href='http://www.meiduo.site:8080/index.html?token={user_id}'>激活</a>"
+        # send_mail(subject, message, from_email, recipient_list, html_message=html_message)
+        # 返回响应
+        return JsonResponse({'code': 0, 'errmsg': '添加邮箱成功'})
+
